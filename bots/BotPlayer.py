@@ -36,7 +36,7 @@ class BotPlayer(Player):
         terraform_counts = []
         mines_counts = []
         mining_tile = []
-        max_mine_tile = []
+        max_mine_tile = TileInfo
         max_mine = 0
         quadrant_tiles = []
         explored_tiles = []
@@ -55,81 +55,96 @@ class BotPlayer(Player):
                         tile = game_state_info.map[row][col]
                         if tile is not None:  # ignore fogged tiles
                             explored_tiles += []
-                            if tile.robot is None:  # ignore occupied tiles
-                                if tile.terraform > 0:  # ensure tile is ally-terraformed
-                                    count += 1
-                                    ally_tiles += [tile]
-                                    single_quadrant_tiles += [tile]
-                                if tile.mining > 0:
-                                    if tile.mining > max_mine : #and tuple(tile) not in self.miningrobots
-                                        # location of maximum mineable tile
-                                        max_mine_tile = [tile]
-                                    mines += tile.mining
-                                    mining_tile += [tile]
+                            # if tile.robot is None:  # ignore occupied tiles
+                            if tile.terraform > 0:  # ensure tile is ally-terraformed
+                                count += 1
+                                ally_tiles += [tile]
+                                single_quadrant_tiles += [tile]
+                            if tile.mining > 0:
+                                if tile.mining > max_mine : #and tuple(tile) not in self.miningrobots
+                                    # location of maximum mineable tile
+                                    max_mine_tile = tile
+                                mines += tile.mining
+                                mining_tile += [tile]
                 terraform_counts.append(count)
                 mines_counts.append(mines)
                 quadrant_tiles.append(single_quadrant_tiles)
 
         max_mine_count = max(mines_counts)
-        if max_mine_count > 0:
-            quadrant_mines = terraform_counts.index(max_mine_count)
-            deploy_bot = quadrant_tiles[quadrant_mines]
-        else:
-            max_blue_count = max(terraform_counts)
-            quadrant = terraform_counts.index(max_blue_count)
-            deploy_bot = quadrant_tiles[quadrant]
-
-        # enemy = game_state.get_enemy_robots()
-        print(max_mine_tile)
+        print("Ally tiles", ally_tiles)
         turn = game_state.get_turn()
+        if turn < 20:
+            if max_mine_count > 0:
+                quadrant_mines = mines_counts.index(max_mine_count)
+                deploy_bot = quadrant_tiles[quadrant_mines]
+                # if len(deploy_bot)==0:
+                #     max_blue_count = max(terraform_counts)
+                #     quadrant = terraform_counts.index(max_blue_count)
+                #     deploy_bot = quadrant_tiles[quadrant]
+            else:
+                max_blue_count = max(terraform_counts)
+                quadrant = terraform_counts.index(max_blue_count)
+                deploy_bot = quadrant_tiles[quadrant]
+        else:
+            deploy_bot = ally_tiles
+
+
         curr_metal = game_state.get_metal()
         robots = game_state.get_ally_robots()
 
         numberOfMiners = 0
+        numberOfExplorer = 0
+        numberOfTerraformer = 0
         # Find number of each type of robot
         for rname, rob in robots.items():
-            print(f"Robot {rname} at {rob.row, rob.col}")
+            #print(f"Robot {rname} at {rob.row, rob.col}")
             if rob.type.value == "Miner":
                 numberOfMiners += 1
+            if rob.type.value == "Explorer":
+                numberOfExplorer += 1
+            if rob.type.value == "Terraformer":
+                numberOfTerraformer += 1
+
 
         # Spawn a miner in Early game to get most metal
-        if max_mine_count > 0 and len(mining_tile) > numberOfMiners and curr_metal > 100:  # and turn < EARLY
-            close_tile = self.closest_point(deploy_bot, max_mine_tile[0])
-            if game_state.can_spawn_robot(RobotType.MINER, close_tile.row, close_tile.col):
+        if max_mine_count > 0 and len(mining_tile) > numberOfMiners and curr_metal > 50:  # and turn < EARLY
+            print("Mineable Tile"+str(max_mine_tile))
+            close_tile = self.closest_point(deploy_bot, max_mine_tile)
+            if close_tile is not None and game_state.can_spawn_robot(RobotType.MINER, close_tile.row, close_tile.col):
                 createdBot = game_state.spawn_robot(RobotType.MINER, close_tile.row, close_tile.col)
                 # remove created mining bot
-                deploy_bot.remove(close_tile)
-                self.miningrobots[tuple(max_mine_tile)] = createdBot.name
+                #deploy_bot.remove(close_tile)
+                # self.miningrobots[max_mine_tile] = createdBot.name
 
         if len(deploy_bot) > 0:
 
             # Explorer Location
             location = self.find_corners_of_tiles(rows, cols, deploy_bot)
-
             explorer_location = random.choice(location)
-            if game_state.can_spawn_robot(RobotType.EXPLORER, explorer_location.row, explorer_location.col):
+            if numberOfExplorer <= numberOfTerraformer and game_state.can_spawn_robot(RobotType.EXPLORER, explorer_location.row, explorer_location.col):
                 game_state.spawn_robot(RobotType.EXPLORER, explorer_location.row, explorer_location.col)
-                deploy_bot.remove(explorer_location)
+                #deploy_bot.remove(explorer_location)
+
             # Terraformer deployed to closest mine first
-            if max_mine_count > 0 :
-                close_tile = self.closest_point(deploy_bot, max_mine_tile[0])
+            if max_mine_count > 0 and deploy_bot is not None:
+                close_tile = self.closest_point(deploy_bot, max_mine_tile)
                 if game_state.can_spawn_robot(RobotType.TERRAFORMER, close_tile.row, close_tile.col):
                     game_state.spawn_robot(RobotType.TERRAFORMER, close_tile.row, close_tile.col)
-                    deploy_bot.remove(close_tile)
+                    #deploy_bot.remove(close_tile)
             else:
                 explorer_location = random.choice(location)
                 if game_state.can_spawn_robot(RobotType.TERRAFORMER, explorer_location.row, explorer_location.col):
                     game_state.spawn_robot(RobotType.TERRAFORMER, explorer_location.row, explorer_location.col)
-                    deploy_bot.remove(explorer_location)
+                    #deploy_bot.remove(explorer_location)
 
 
 
         for rname, rob in robots.items():
-            print(f"Robot {rname} at {rob.row, rob.col}")
+            print(f"Robot {rname} at {rob.row, rob.col} and type {rob.type.value}")
 
             # randomly move if possible
             if rob.type.value == "Miner":
-                dir, moves = game_state.optimal_path(rob.row, rob.col, max_mine_tile[0].row, max_mine_tile[0].col)
+                dir, moves = game_state.optimal_path(rob.row, rob.col, max_mine_tile.row, max_mine_tile.col)
                 self.movepath(game_state, rname, dir, rob)
 
             elif rob.type.value == "Explorer":
@@ -181,38 +196,39 @@ class BotPlayer(Player):
         for t in coords:
             row = t.row
             col = t.col
-            if not top_left or row + col < top_left[0] + top_left[1]:
+            if not top_left or row + col < top_left.row + top_left.col:
                 top_left = t
 
         # Find top-right corner
         for t in coords:
             row = t.row
             col = t.col
-            if not top_right or row - col < top_right[0] - top_right[1]:
+            if not top_right or row - col < top_right.row - top_right.col:
                 top_right = t
 
         # Find bottom-left corner
         for t in coords:
             row = t.row
             col = t.col
-            if not bottom_left or col - row < bottom_left[1] - bottom_left[0]:
+            if not bottom_left or col - row < bottom_left.col - bottom_left.row:
                 bottom_left = t
 
         # Find bottom-right corner
         for t in coords:
             row = t.row
             col = t.col
-            if not bottom_right or row + col > bottom_right[0] + bottom_right[1]:
+            if not bottom_right or row + col > bottom_right.row + bottom_right.col:
                 bottom_right = t
 
         return top_left, top_right, bottom_left, bottom_right
 
     def closest_point(self, points, reference_point):
         closest_point = None
-        closest_distance = 0
-
+        closest_distance = 1000000
+        print(points)
+        print(reference_point)
         for point in points:
-            distance = math.sqrt(sum([(point[i] - reference_point[i]) ** 2 for i in range(len(point))]))
+            distance = math.sqrt(abs(point.row - reference_point.row) ** 2 + abs(point.col - reference_point.col) ** 2)
             if distance < closest_distance:
                 closest_distance = distance
                 closest_point = point
