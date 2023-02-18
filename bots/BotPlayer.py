@@ -13,6 +13,8 @@ class BotPlayer(Player):
     A child class that implements the play_turn method
     """
 
+    miningrobots = {}
+
     def __init__(self, team: Team):
         Player.__init__(self, team)
 
@@ -38,6 +40,7 @@ class BotPlayer(Player):
         max_mine = 0
         quadrant_tiles = []
         explored_tiles = []
+
         for i in range(2):
             for j in range(2):
                 row_start = i * rows // 2
@@ -58,7 +61,8 @@ class BotPlayer(Player):
                                     ally_tiles += [tile]
                                     single_quadrant_tiles += [tile]
                                 if tile.mining > 0:
-                                    if tile.mining > max_mine:
+                                    if tile.mining > max_mine : #and tuple(tile) not in self.miningrobots
+                                        # location of maximum mineable tile
                                         max_mine_tile = [tile]
                                     mines += tile.mining
                                     mining_tile += [tile]
@@ -85,43 +89,85 @@ class BotPlayer(Player):
         # Find number of each type of robot
         for rname, rob in robots.items():
             print(f"Robot {rname} at {rob.row, rob.col}")
-            if rob.get_type() == "MINER":
+            if rob.type.value == "Miner":
                 numberOfMiners += 1
 
         # Spawn a miner in Early game to get most metal
         if max_mine_count > 0 and len(mining_tile) > numberOfMiners and curr_metal > 100:  # and turn < EARLY
-            close_tile = self.closest_point(deploy_bot, max_mine_tile)
+            close_tile = self.closest_point(deploy_bot, max_mine_tile[0])
             if game_state.can_spawn_robot(RobotType.MINER, close_tile.row, close_tile.col):
-                game_state.spawn_robot(RobotType.MINER, close_tile.row, close_tile.col)
+                createdBot = game_state.spawn_robot(RobotType.MINER, close_tile.row, close_tile.col)
+                # remove created mining bot
                 deploy_bot.remove(close_tile)
+                self.miningrobots[tuple(max_mine_tile)] = createdBot.name
 
         if len(deploy_bot) > 0:
 
-            for t in deploy_bot:
-                # pick a random one to spawn on
-                location = self.find_corners_of_tiles(rows, cols, deploy_bot)
+            # Explorer Location
+            location = self.find_corners_of_tiles(rows, cols, deploy_bot)
 
+            explorer_location = random.choice(location)
+            if game_state.can_spawn_robot(RobotType.EXPLORER, explorer_location.row, explorer_location.col):
+                game_state.spawn_robot(RobotType.EXPLORER, explorer_location.row, explorer_location.col)
+                deploy_bot.remove(explorer_location)
+            # Terraformer deployed to closest mine first
+            if max_mine_count > 0 :
+                close_tile = self.closest_point(deploy_bot, max_mine_tile[0])
+                if game_state.can_spawn_robot(RobotType.TERRAFORMER, close_tile.row, close_tile.col):
+                    game_state.spawn_robot(RobotType.TERRAFORMER, close_tile.row, close_tile.col)
+                    deploy_bot.remove(close_tile)
+            else:
                 explorer_location = random.choice(location)
-                if game_state.can_spawn_robot(RobotType.EXPLORER, explorer_location[0], explorer_location[1]):
-                    game_state.spawn_robot(RobotType.EXPLORER, explorer_location[0], explorer_location[1])
+                if game_state.can_spawn_robot(RobotType.TERRAFORMER, explorer_location.row, explorer_location.col):
+                    game_state.spawn_robot(RobotType.TERRAFORMER, explorer_location.row, explorer_location.col)
+                    deploy_bot.remove(explorer_location)
 
-                    # self.find_closest_points(ally_tiles, height)
-                    # check if we can spawn here (checks if we can afford, tile is empty, and tile is ours)
-                    # if game_state.can_spawn_robot(type1, spawn_loc.row, spawn_loc.col):
-                    #     game_state.spawn_robot(spawn_type, spawn_loc.row, spawn_loc.col)
 
-        # move robots
-        # robots = game_state.get_ally_robots()
-        #
-        # # iterate through dictionary of robots
-        # for rname, rob in robots.items():
-        #
-        #
-        # if len(ally_tiles) > 0:
-        #     if(turn == 3):
-        #         robotype = RobotType.EXPLORER
+
+        for rname, rob in robots.items():
+            print(f"Robot {rname} at {rob.row, rob.col}")
+
+            # randomly move if possible
+            if rob.type.value == "Miner":
+                dir, moves = game_state.optimal_path(rob.row, rob.col, max_mine_tile[0].row, max_mine_tile[0].col)
+                self.movepath(game_state, rname, dir, rob)
+
+            elif rob.type.value == "Explorer":
+                all_dirs = [dir for dir in Direction]
+                move_dir = random.choice(all_dirs)
+                self.movepath(game_state, rname, move_dir, rob)
+
+            elif rob.type.value == "Terraformer":
+                all_dirs = [dir for dir in Direction]
+                move_dir = random.choice(all_dirs)
+                self.movepath(game_state, rname, move_dir, rob)
+
+            # check if we can move in this direction
+            # if game_state.can_move_robot(rname, move_dir):
+            #     # try to not collide into robots from our team
+            #     dest_loc = (rob.row + move_dir.value[0], rob.col + move_dir.value[1])
+            #     dest_tile = game_state.get_map()[dest_loc[0]][dest_loc[1]]
+            #
+            #     if dest_tile.robot is None or dest_tile.robot.team != self.team:
+            #         game_state.move_robot(rname, move_dir)
+            #
+            # # action if possible
+            # if game_state.can_robot_action(rname):
+            #     game_state.robot_action(rname)
 
         return
+
+    def movepath(self, game_state, rname, move_dir, rob):
+        if game_state.can_move_robot(rname, move_dir):
+            # try to not collide into robots from our team
+            dest_loc = (rob.row + move_dir.value[0], rob.col + move_dir.value[1])
+            dest_tile = game_state.get_map()[dest_loc[0]][dest_loc[1]]
+
+            if dest_tile.robot is None or dest_tile.robot.team != self.team:
+                game_state.move_robot(rname, move_dir)
+
+        if game_state.can_robot_action(rname):
+            game_state.robot_action(rname)
 
     def find_corners_of_tiles(self, rows, cols, coords):
         # rows = len(grid)
@@ -136,28 +182,28 @@ class BotPlayer(Player):
             row = t.row
             col = t.col
             if not top_left or row + col < top_left[0] + top_left[1]:
-                top_left = (row, col)
+                top_left = t
 
         # Find top-right corner
         for t in coords:
             row = t.row
             col = t.col
             if not top_right or row - col < top_right[0] - top_right[1]:
-                top_right = (row, col)
+                top_right = t
 
         # Find bottom-left corner
         for t in coords:
             row = t.row
             col = t.col
             if not bottom_left or col - row < bottom_left[1] - bottom_left[0]:
-                bottom_left = (row, col)
+                bottom_left = t
 
         # Find bottom-right corner
         for t in coords:
             row = t.row
             col = t.col
             if not bottom_right or row + col > bottom_right[0] + bottom_right[1]:
-                bottom_right = (row, col)
+                bottom_right = t
 
         return top_left, top_right, bottom_left, bottom_right
 
