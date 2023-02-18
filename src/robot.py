@@ -1,7 +1,6 @@
 from src.game_constants import Direction, GameConstants, RobotType, TileState, Team
 from src.map import Map
 from src.info import RobotInfo
-from dataclasses import dataclass
 
 from src.errors import *
 
@@ -210,3 +209,68 @@ class Explorer_Robot(Robot):
 
         tiles = map.explore(self._row, self._col, self._team)
         return tiles
+
+    # def count_non_red_tiles_around_blue(grid, x, y):
+    #     count = 0
+    # if x > 0:
+    #     if grid[x-1][y] != "red":
+    #         count += 1
+    #     if y > 0 and grid[x-1][y-1] != "red":
+    #         count += 1
+    #     if y < len(grid[x])-1 and grid[x-1][y+1] != "red":
+    #         count += 1
+    # if y > 0 and grid[x][y-1] != "red":
+    #     count += 1
+    # if y < len(grid[x])-1 and grid[x][y+1] != "red":
+    #     count += 1
+    # if x < len(grid)-1:
+    #     if grid[x+1][y] != "red":
+    #         count += 1
+    #     if y > 0 and grid[x+1][y-1] != "red":
+    #         count += 1
+    #     if y < len(grid[x])-1 and grid[x+1][y+1] != "red":
+    #         count += 1
+    # return count
+
+
+ # find the center coordinate
+# def get_center(coordinates):
+#     n = len(coordinates)
+#     x_sum = sum(coord[0] for coord in coordinates)
+#     y_sum = sum(coord[1] for coord in coordinates)
+#     x_center = x_sum / n
+#     y_center = y_sum / n
+#     return (x_center, y_center)
+
+# find the quadrant of a coordinate
+# def get_quadrant(x, y, xc, yc):
+#     if x > xc and y > yc:
+#         return "Quadrant 1"
+#     elif x < xc and y > yc:
+#         return "Quadrant 2"
+#     elif x < xc and y < yc:
+#         return "Quadrant 3"
+#     elif x > xc and y < yc:
+#         return "Quadrant 4"
+#     elif x == xc and y == yc:
+#         return "Origin"
+#     elif x == xc:
+#         return "Y-Axis"
+#     elif y == yc:
+#         return "X-Axis"
+
+## to find corner terraform coordinates using a subgrid
+# def get_corner_coordinates(grid):
+#     corner_coordinates = []
+#     for i in range(len(grid)):
+#         for j in range(len(grid[0])):
+#             if grid[i][j] == 'B':
+#                 if len(corner_coordinates) == 0:
+#                     corner_coordinates.append((i,j))
+#                 elif len(corner_coordinates) == 1 and i != corner_coordinates[0][0] and j != corner_coordinates[0][1]:
+#                     corner_coordinates.append((i,j))
+#                 elif len(corner_coordinates) == 2 and i == corner_coordinates[0][0] and j != corner_coordinates[0][1]:
+#                     corner_coordinates.append((i,j))
+#                 elif len(corner_coordinates) == 3 and i != corner_coordinates[0][0] and j == corner_coordinates[0][1]:
+#                     corner_coordinates.append((i,j))
+#     return corner_coordinates
